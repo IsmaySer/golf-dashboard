@@ -820,20 +820,21 @@ function initDashboard() {
 
   const callbackName = 'golfSheetCallback_' + Date.now();
   const script = document.createElement('script');
-  script.src = APPS_SCRIPT_URL + '?callback=' + callbackName + '&t=' + Date.now();
+  const url = APPS_SCRIPT_URL + '?callback=' + callbackName + '&t=' + Date.now();
+  script.src = url;
+  script.type = 'text/javascript';
 
   const timeout = setTimeout(() => {
-    showUploadMsg('ℹ️ Google Sheets niet bereikbaar, gebruik ingebouwde data.', 'info');
-    delete window[callbackName];
-    document.body.removeChild(script);
+    showUploadMsg('ℹ️ Google Sheets time-out, gebruik ingebouwde data.', 'info');
+    try { delete window[callbackName]; document.body.removeChild(script); } catch(e) {}
     DATA = processData(RAW_DATA);
     renderAll();
-  }, 8000);
+  }, 15000);
 
   window[callbackName] = function(sheetData) {
     clearTimeout(timeout);
     delete window[callbackName];
-    document.body.removeChild(script);
+    try { document.body.removeChild(script); } catch(e) {}
     if (sheetData && sheetData.length > 0) {
       const sheetKeys = new Set(sheetData.map(r => `${r.date_str}|${r.Club}|${r.carry}|${r.total}`));
       const embeddedOnly = RAW_DATA.filter(r => !sheetKeys.has(`${r.date_str}|${r.Club}|${r.carry}|${r.total}`));
@@ -849,12 +850,13 @@ function initDashboard() {
 
   script.onerror = function() {
     clearTimeout(timeout);
-    showUploadMsg('ℹ️ Google Sheets niet bereikbaar, gebruik ingebouwde data.', 'info');
+    showUploadMsg('⚠️ Fout bij laden Google Sheets, gebruik ingebouwde data.', 'info');
+    try { delete window[callbackName]; document.body.removeChild(script); } catch(e) {}
     DATA = processData(RAW_DATA);
     renderAll();
   };
 
-  document.body.appendChild(script);
+  document.head.appendChild(script);
 }
 
 function renderAll() {
