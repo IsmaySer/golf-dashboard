@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⛳ Ismay's Golf Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #181c27;
+    --surface2: #1e2433;
+    --border: rgba(255,255,255,0.07);
+    --green: #4ade80;
+    --green-dim: rgba(74,222,128,0.15);
+    --gold: #fbbf24;
+    --gold-dim: rgba(251,191,36,0.12);
+    --text: #e8eaf0;
+    --text-dim: #8890a4;
+    --accent: #7c6cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo { font-size: 2.2rem; }
+  .header-text h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.8rem;
+    color: var(--text);
+    line-height: 1;
+  }
+  .header-text p { color: var(--text-dim); font-size: 0.85rem; margin-top: 4px; }
+  .header-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge-hcp {
+    background: var(--gold-dim);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    font-weight: 600;
+    font-size: 0.8rem;
+    padding: 6px 14px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+  .badge-hcp:hover { background: rgba(251,191,36,0.25); }
+  .badge-hcp-edit {
+    background: var(--gold-dim);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    font-weight: 600;
+    font-size: 0.8rem;
+    padding: 6px 14px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+    align-items: center;
+    gap: 4px;
+  }
+  .upload-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    padding: 6px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+  .upload-btn:hover { border-color: var(--accent); color: var(--text); background: rgba(124,108,255,0.1); }
+
+  /* KPI Cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--green), transparent);
+  }
+  .kpi .label { font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+  .kpi .value { font-family: 'DM Serif Display', serif; font-size: 1.9rem; color: var(--green); line-height: 1; }
+  .kpi .sub { font-size: 0.75rem; color: var(--text-dim); margin-top: 4px; }
+  .kpi.gold::before { background: linear-gradient(90deg, var(--gold), transparent); }
+  .kpi.gold .value { color: var(--gold); }
+  .kpi.accent::before { background: linear-gradient(90deg, var(--accent), transparent); }
+  .kpi.accent .value { color: var(--accent); }
+
+  /* Section title */
+  .section-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.15rem;
+    margin-bottom: 16px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title span { font-size: 1.1rem; }
+
+  /* Club filter pills */
+  .club-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .pill {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+  }
+  .pill:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+  .pill.active {
+    background: var(--green-dim);
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .pill.all-btn.active {
+    background: rgba(124,108,255,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Metric toggle */
+  .metric-toggle {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    width: fit-content;
+  }
+  .mtbtn {
+    padding: 6px 18px;
+    border-radius: 7px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+  }
+  .mtbtn.active {
+    background: var(--surface2);
+    color: var(--text);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+
+  /* Charts grid */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+  }
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .club-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1rem;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .club-icon { font-size: 1.1rem; }
+  .chart-meta { text-align: right; }
+  .chart-meta .shots { font-size: 0.75rem; color: var(--text-dim); }
+  .chart-meta .best {
+    font-size: 0.8rem;
+    color: var(--green);
+    font-weight: 600;
+  }
+  .chart-canvas-wrap { position: relative; height: 180px; }
+
+  /* Club shots table */
+  .shots-table {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th {
+    background: var(--surface2);
+    font-size: 0.73rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 500;
+  }
+  td {
+    padding: 12px 16px;
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+  }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 180px;
+  }
+  .bar-bg {
+    flex: 1;
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--green);
+    transition: width 0.6s ease;
+  }
+  .needs-icon { font-size: 0.9rem; }
+  .trend-up { color: var(--green); }
+  .trend-flat { color: var(--text-dim); }
+
+
+
+  /* Progress bar - single big chart */
+  .big-chart {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 28px;
+  }
+  .big-chart-wrap { position: relative; height: 280px; }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 600px) {
+    body { padding: 12px; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⛳</div>
+  <div class="header-text">
+    <h1>Ismay's Golf Dashboard</h1>
+    <p>Driving Range · Gestart april 2026</p>
+  </div>
+  <div class="header-actions">
+    <div class="badge-hcp" id="hcpDisplay" title="Klik om handicap aan te passen" onclick="showHCPEdit()">
+      HCP <span id="hcpValue">54</span>
+    </div>
+    <div class="badge-hcp-edit" id="hcpEdit" style="display:none">
+      HCP <input id="hcpInput" type="number" min="0" max="54" step="0.1" value="54"
+        style="width:44px;background:transparent;border:none;border-bottom:1px solid var(--gold);color:var(--gold);font-weight:600;font-size:0.8rem;outline:none;text-align:center;"
+        onkeydown="if(event.key==='Enter')saveHCP();if(event.key==='Escape')cancelHCP();"
+        onblur="saveHCP()">
+    </div>
+    <div class="upload-btn" onclick="document.getElementById('fileInput').click()" title="Nieuwe data uploaden">
+      📂 <span>Upload</span>
+    </div>
+    <input type="file" id="fileInput" accept=".csv" style="display:none">
+  </div>
+</header>
+<div id="uploadMsg" style="display:none; text-align:center; font-size:0.82rem; margin-top:8px; margin-bottom:4px; font-weight:500;"></div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<!-- Voortgang per club: grote grafiek -->
+<div class="section-title"><span>📈</span> Gemiddelde Carry per Club over de Tijd</div>
+<div class="metric-toggle" id="metricToggle">
+  <button class="mtbtn active" data-metric="carry" onclick="setMetric(this)">Carry</button>
+  <button class="mtbtn" data-metric="total" onclick="setMetric(this)">Totaal</button>
+</div>
+<div class="big-chart">
+  <div class="big-chart-wrap"><canvas id="overviewChart"></canvas></div>
+</div>
+
+<!-- Individuele club grafieken -->
+<div class="section-title"><span>🏌️</span> Voortgang per Club</div>
+<div class="club-filter" id="clubFilter"></div>
+<div class="charts-grid" id="chartsGrid"></div>
+
+<!-- Slagen tabel -->
+<div class="section-title"><span>🎯</span> Club Overzicht — Welke club moet je oefenen?</div>
+<div class="shots-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Club</th>
+        <th>Slagen</th>
+        <th>Gem. Carry (m)</th>
+        <th>Gem. Totaal (m)</th>
+        <th>Best Carry (m)</th>
+        <th>Voortgang</th>
+        <th>Tip</th>
+      </tr>
+    </thead>
+    <tbody id="shotsTableBody"></tbody>
+  </table>
+</div>
+
+<footer>Dashboard gebouwd op jouw eigen data · Voeg nieuwe Excel-data toe om bij te houden ⛳</footer>
+
+<script>
+// === DATA ===
+const RAW_DATA = [];
+
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwH9JO-LcOIQ-AUj8Zf9S0mREYmZOG38-a0wf1L34FcQaL9Mp0tM-M-Hv_1wSMGXMCvJQ/exec';
+
+// === CONFIGURATION ===
+// Vaste volgorde van kort naar lang
+const CLUB_ORDER = ['sand_wedge','pitching_wedge','9_iron','8_iron','7_iron','6_iron','5_wood','5_hybrid','driver'];
+
+const CLUB_ICONS = {
+  'sand_wedge':'🏖️','pitching_wedge':'🎯','9_iron':'🔩','8_iron':'🔨',
+  '7_iron':'🔧','6_iron':'⚙️','5_wood':'🌲','5_hybrid':'🌿','driver':'🚀'
+};
+const CLUB_COLORS = {
+  'sand_wedge':   '#fbbf24',  // geel
+  'pitching_wedge':'#cbd5e1', // donker blauw
+  '9_iron':       '#a855f7',  // paars
+  '8_iron':       '#f472b6',  // roze
+  '7_iron':       '#fb923c',  // oranje
+  '6_iron':       '#991b1b',  // donker rood
+  '5_wood':       '#4ade80',  // groen
+  '5_hybrid':     '#38bdf8',  // licht blauw
+  'driver':       '#FD9D9D'   // violet
+};
+const CLUB_DISPLAY = {
+  'sand_wedge':'Sand Wedge','pitching_wedge':'Pitching Wedge','9_iron':'9 Iron',
+  '8_iron':'8 Iron','7_iron':'7 Iron','6_iron':'6 Iron',
+  '5_wood':'5 Wood','5_hybrid':'5 Hybrid','driver':'Driver'
+};
+
+let currentMetric = 'carry';
+let activeClubs = null;
+let overviewChart = null;
+const clubCharts = {};
+
+// === DATA PROCESSING ===
+function processData(data) {
+  const presentClubs = [...new Set(data.map(d => d.Club))];
+  const clubs = CLUB_ORDER.filter(c => presentClubs.includes(c));
+  const dates = [...new Set(data.map(d => d.date_str))].sort();
+
+  // Club stats
+  const clubStats = {};
+  clubs.forEach(club => {
+    const rows = data.filter(d => d.Club === club);
+    const carries = rows.map(d => d.carry).filter(v => v > 0);
+    const totals = rows.map(d => d.total).filter(v => v > 0);
+    clubStats[club] = {
+      shots: rows.length,
+      avgCarry: carries.reduce((a,b)=>a+b,0)/carries.length,
+      avgTotal: totals.reduce((a,b)=>a+b,0)/totals.length,
+      bestCarry: Math.max(...carries),
+      bestTotal: Math.max(...totals),
+      rows
+    };
+  });
+
+  // Daily averages per club
+  const dailyByClub = {};
+  clubs.forEach(club => {
+    dailyByClub[club] = {};
+    dates.forEach(date => {
+      const rows = data.filter(d => d.Club === club && d.date_str === date);
+      if (rows.length > 0) {
+        const carries = rows.map(d=>d.carry).filter(v=>v>0);
+        const totals = rows.map(d=>d.total).filter(v=>v>0);
+        dailyByClub[club][date] = {
+          carry: carries.length ? Math.round(carries.reduce((a,b)=>a+b,0)/carries.length) : null,
+          total: totals.length ? Math.round(totals.reduce((a,b)=>a+b,0)/totals.length) : null,
+          count: rows.length
+        };
+      }
+    });
+  });
+
+  return { clubs, dates, clubStats, dailyByClub };
+}
+
+let DATA = processData(RAW_DATA);
+
+// === KPI ===
+function renderKPIs() {
+  const { clubs, clubStats } = DATA;
+  const total = RAW_DATA.length;
+  const sessions = [...new Set(RAW_DATA.map(d=>d.date_str))].length;
+  const bestCarryClub = clubs.reduce((a,b) => clubStats[a].bestCarry > clubStats[b].bestCarry ? a : b);
+  const bestCarry = Math.round(clubStats[bestCarryClub].bestCarry);
+  const topClub = clubs.reduce((a,b)=>clubStats[a].shots>clubStats[b].shots?a:b);
+
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi"><div class="label">Totaal slagen</div><div class="value">${total}</div><div class="sub">Driving range</div></div>
+    <div class="kpi gold"><div class="label">Sessies</div><div class="value">${sessions}</div><div class="sub">Aparte trainingsdagen</div></div>
+    <div class="kpi accent"><div class="label">Clubs geoefend</div><div class="value">${clubs.length}</div><div class="sub">Verschillende clubs</div></div>
+    <div class="kpi gold"><div class="label">Best carry</div><div class="value">${bestCarry}m</div><div class="sub">${CLUB_DISPLAY[bestCarryClub]||bestCarryClub}</div></div>
+    <div class="kpi"><div class="label">Meest geoefend</div><div class="value" style="font-size:1.2rem">${CLUB_ICONS[topClub]||''} ${CLUB_DISPLAY[topClub]||topClub}</div><div class="sub">${clubStats[topClub].shots} slagen</div></div>
+  `;
+}
+
+// === OVERVIEW CHART ===
+function renderOverviewChart() {
+  const { clubs, dates, dailyByClub } = DATA;
+  const display = activeClubs || clubs;
+
+  const datasets = display.map((club, i) => {
+    const color = CLUB_COLORS[club] || '#aaaaaa';
+    const data = dates.map(d => {
+      const day = dailyByClub[club][d];
+      return day ? day[currentMetric] : null;
+    });
+    return {
+      label: CLUB_DISPLAY[club] || club,
+      data,
+      borderColor: color,
+      backgroundColor: color + '22',
+      borderWidth: 2,
+      pointRadius: 4,
+      pointHoverRadius: 7,
+      tension: 0.3,
+      spanGaps: true
+    };
+  });
+
+  if (overviewChart) overviewChart.destroy();
+  const ctx = document.getElementById('overviewChart').getContext('2d');
+  overviewChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: dates.map(d => new Date(d).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { color: '#8890a4', font: { size: 11 }, boxWidth: 14 } },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        x: { ticks: { color: '#8890a4', font: {size:10} }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: '#8890a4', font:{size:10}, callback: v => v+'m' }, grid: { color: 'rgba(255,255,255,0.06)' } }
+      },
+      interaction: { mode: 'nearest', axis: 'x', intersect: false }
+    }
+  });
+}
+
+// === INDIVIDUAL CLUB CHARTS ===
+function renderClubCharts() {
+  const { clubs, dates, dailyByClub } = DATA;
+  const display = activeClubs || clubs;
+  const grid = document.getElementById('chartsGrid');
+  grid.innerHTML = '';
+
+  display.forEach(club => {
+    const stats = DATA.clubStats[club];
+    const color = CLUB_COLORS[club] || '#aaaaaa';
+    const dayData = dates.filter(d => dailyByClub[club][d]);
+
+    const div = document.createElement('div');
+    div.className = 'chart-card';
+    div.innerHTML = `
+      <div class="chart-header">
+        <div class="club-name"><span class="club-icon">${CLUB_ICONS[club]||'🏌️'}</span>${CLUB_DISPLAY[club]||club}</div>
+        <div class="chart-meta">
+          <div class="shots">${stats.shots} slagen</div>
+          <div class="best">Best carry: ${Math.round(stats.bestCarry)}m</div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap"><canvas id="chart_${club.replace(/[^a-z0-9]/gi,'_')}"></canvas></div>
+    `;
+    grid.appendChild(div);
+
+    const canvasId = 'chart_'+club.replace(/[^a-z0-9]/gi,'_');
+    const carryData = dayData.map(d => dailyByClub[club][d].carry);
+    const totalData = dayData.map(d => dailyByClub[club][d].total);
+    const labels = dayData.map(d => new Date(d).toLocaleDateString('nl-NL',{day:'numeric',month:'short'}));
+
+    setTimeout(() => {
+      const ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+      if (clubCharts[club]) clubCharts[club].destroy();
+      clubCharts[club] = new Chart(ctx.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Carry',
+              data: carryData,
+              borderColor: color,
+              backgroundColor: color+'20',
+              borderWidth: 2.5,
+              pointRadius: 5,
+              tension: 0.3,
+              fill: true
+            },
+            {
+              label: 'Totaal',
+              data: totalData,
+              borderColor: color+'99',
+              borderWidth: 1.5,
+              pointRadius: 3,
+              tension: 0.3,
+              borderDash: [5,3],
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { color: '#8890a4', font:{size:10}, boxWidth:10 } },
+            tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}m` } }
+          },
+          scales: {
+            x: { ticks: { color: '#6b7280', font:{size:9} }, grid: { color: 'rgba(255,255,255,0.03)' } },
+            y: { ticks: { color: '#6b7280', font:{size:9}, callback: v=>v+'m' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+          }
+        }
+      });
+    }, 50);
+  });
+}
+
+// === SHOTS TABLE ===
+function renderTable() {
+  const { clubs, clubStats, dates } = DATA;
+  const maxShots = Math.max(...clubs.map(c => clubStats[c].shots));
+  const tbody = document.getElementById('shotsTableBody');
+
+  const sorted = [...clubs].sort((a,b) => clubStats[a].shots - clubStats[b].shots); // least practiced first = needs attention
+
+  tbody.innerHTML = sorted.map((club, i) => {
+    const s = clubStats[club];
+    const pct = Math.round(s.shots / maxShots * 100);
+    const needsPractice = s.shots < 20;
+    const icon = CLUB_ICONS[club] || '🏌️';
+
+    // Trend: compare first half vs second half carry
+    const allRows = [...s.rows].sort((a,b)=>a.date_str.localeCompare(b.date_str));
+    const half = Math.floor(allRows.length/2);
+    const first = allRows.slice(0,half).map(d=>d.carry).filter(v=>v>0);
+    const last = allRows.slice(half).map(d=>d.carry).filter(v=>v>0);
+    const avgFirst = first.length ? first.reduce((a,b)=>a+b,0)/first.length : 0;
+    const avgLast = last.length ? last.reduce((a,b)=>a+b,0)/last.length : 0;
+    const trendUp = avgLast > avgFirst + 2;
+    const trendIcon = trendUp ? '📈' : (avgLast < avgFirst - 2 ? '📉' : '➡️');
+    const trendClass = trendUp ? 'trend-up' : 'trend-flat';
+
+    const tip = needsPractice ? `<span class="needs-icon">⚠️ Meer oefenen!</span>` :
+      (trendUp ? `<span style="color:var(--green)">Goed bezig! ⭐</span>` : `<span style="color:var(--text-dim)">Consistentie ↗</span>`);
+
+    return `<tr>
+      <td><strong>${icon} ${CLUB_DISPLAY[club]||club}</strong></td>
+      <td>${s.shots}</td>
+      <td>${Math.round(s.avgCarry)}m</td>
+      <td>${Math.round(s.avgTotal)}m</td>
+      <td style="color:var(--gold)">${Math.round(s.bestCarry)}m</td>
+      <td>
+        <div class="bar-wrap">
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <span class="${trendClass}" style="font-size:1rem">${trendIcon}</span>
+        </div>
+      </td>
+      <td>${tip}</td>
+    </tr>`;
+  }).join('');
+}
+
+// === CLUB FILTER PILLS ===
+function renderClubFilter() {
+  const { clubs } = DATA;
+  const container = document.getElementById('clubFilter');
+  container.innerHTML = `<button class="pill all-btn active" onclick="filterClubs(null, this)">Alle clubs</button>` +
+    clubs.map(club => `<button class="pill" data-club="${club}" onclick="filterClubs('${club}', this)">${CLUB_ICONS[club]||''} ${CLUB_DISPLAY[club]||club}</button>`).join('');
+}
+
+function filterClubs(club, btn) {
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  activeClubs = club ? [club] : null;
+  renderOverviewChart();
+  renderClubCharts();
+}
+
+function setMetric(btn) {
+  document.querySelectorAll('.mtbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentMetric = btn.dataset.metric;
+  renderOverviewChart();
+}
+
+// === FILE UPLOAD ===
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const text = evt.target.result;
+    const newRecords = parseCSV(text);
+    if (newRecords.length === 0) {
+      showUploadMsg('❌ Geen geldige data gevonden. Controleer of het bestand de juiste kolommen heeft (date, Club, carry, total).', 'error');
+      return;
+    }
+    // Filter out 3_hybrid
+    const filtered = newRecords.filter(r => r.Club !== '3_hybrid');
+    // Deduplicate: don't add records with same date+Club+carry+total
+    const existing = new Set(RAW_DATA.map(r => `${r.date_str}|${r.Club}|${r.carry}|${r.total}`));
+    const added = filtered.filter(r => !existing.has(`${r.date_str}|${r.Club}|${r.carry}|${r.total}`));
+    if (added.length === 0) {
+      showUploadMsg('ℹ️ Geen nieuwe slagen gevonden — deze data staat al in het dashboard.', 'info');
+      return;
+    }
+    // Update dashboard immediately
+    RAW_DATA.push(...added);
+    DATA = processData(RAW_DATA);
+    activeClubs = null;
+    renderKPIs();
+    renderClubFilter();
+    renderOverviewChart();
+    renderClubCharts();
+    renderTable();
+    showUploadMsg(`⏳ ${added.length} slagen toegevoegd, opslaan naar Google Sheets...`, 'info');
+    // Save to Google Sheets
+    saveToSheet(added);
+  };
+  reader.readAsText(file);
+  this.value = '';
+});
+
+function saveToSheet(records) {
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(records)
+  }).then(() => {
+    showUploadMsg(`✅ Data opgeslagen in Google Sheets! Dashboard bijgewerkt.`, 'success');
+  }).catch(err => {
+    showUploadMsg('⚠️ Dashboard bijgewerkt, maar opslaan naar Google Sheets mislukt.', 'error');
+  });
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n').filter(l => l.trim());
+  if (lines.length < 2) return [];
+
+  // Auto-detect delimiter
+  const sep = lines[0].includes(';') ? ';' : ',';
+  const headers = lines[0].split(sep).map(h => h.trim().replace(/^"|"$/g,''));
+
+  const idx = {
+    date: headers.findIndex(h => h.toLowerCase() === 'date'),
+    club: headers.findIndex(h => h.toLowerCase() === 'club'),
+    carry: headers.findIndex(h => h.toLowerCase() === 'carry'),
+    total: headers.findIndex(h => h.toLowerCase() === 'total'),
+    clubSpeed: headers.findIndex(h => h.toLowerCase().includes('clubspeed')),
+    ballSpeed: headers.findIndex(h => h.toLowerCase().includes('ballspeed')),
+    height: headers.findIndex(h => h.toLowerCase().includes('height') || h.toLowerCase().includes('peakheight')),
+    classification: headers.findIndex(h => h.toLowerCase() === 'classification'),
+  };
+
+  if (idx.club === -1 || idx.carry === -1 || idx.total === -1) return [];
+
+  const records = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(sep).map(c => c.trim().replace(/^"|"$/g,''));
+    if (cols.length < 3) continue;
+
+    // Parse date
+    let date_str = null;
+    if (idx.date !== -1 && cols[idx.date]) {
+      const raw = cols[idx.date];
+      // Try ISO first: 2026-06-08
+      const iso = raw.match(/(\d{4}-\d{2}-\d{2})/);
+      if (iso) {
+        date_str = iso[1];
+      } else {
+        // Try "Mon Jun 08 2026..." — parse manually to avoid timezone issues
+        const MONTHS = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+        const m = raw.match(/\w{3}\s+(\w{3})\s+(\d{1,2})\s+(\d{4})/);
+        if (m) {
+          const mon = MONTHS[m[1]];
+          const day = m[2].padStart(2,'0');
+          const yr = m[3];
+          if (mon) date_str = yr+'-'+mon+'-'+day;
+        }
+      }
+    }
+    if (!date_str) continue; // skip rows without a valid date
+
+    // Parse numbers — handle both comma and dot decimals
+    const toNum = v => v ? parseFloat(String(v).replace(',','.')) : null;
+    const carry = toNum(cols[idx.carry]);
+    const total = toNum(cols[idx.total]);
+    if (!carry || !total || isNaN(carry) || isNaN(total)) continue;
+
+    records.push({
+      date_str,
+      Club: cols[idx.club] || '',
+      carry,
+      total,
+      clubSpeed: idx.clubSpeed !== -1 ? toNum(cols[idx.clubSpeed]) : null,
+      ballSpeed: idx.ballSpeed !== -1 ? toNum(cols[idx.ballSpeed]) : null,
+      height: idx.height !== -1 ? toNum(cols[idx.height]) : null,
+      classification: idx.classification !== -1 ? (cols[idx.classification] || '') : '',
+    });
+  }
+  return records;
+}
+
+function showUploadMsg(msg, type) {
+  const el = document.getElementById('uploadMsg');
+  const colors = { success: 'var(--green)', error: '#f87171', info: 'var(--gold)' };
+  el.textContent = msg;
+  el.style.color = colors[type] || 'var(--text)';
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 5000);
+}
+
+// === HCP EDITOR ===
+function showHCPEdit() {
+  const current = document.getElementById('hcpValue').textContent.replace(',','.');
+  document.getElementById('hcpInput').value = parseFloat(current);
+  document.getElementById('hcpDisplay').style.display = 'none';
+  document.getElementById('hcpEdit').style.display = 'flex';
+  setTimeout(() => document.getElementById('hcpInput').focus(), 50);
+}
+function saveHCP() {
+  const num = parseFloat(document.getElementById('hcpInput').value);
+  if (!isNaN(num) && num >= 0 && num <= 54) {
+    const display = Number.isInteger(num) ? String(num) : num.toFixed(1).replace('.',',');
+    document.getElementById('hcpValue').textContent = display;
+    // Save to Google Sheets
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'hcp', value: num })
+    });
+  }
+  document.getElementById('hcpEdit').style.display = 'none';
+  document.getElementById('hcpDisplay').style.display = '';
+}
+function cancelHCP() {
+  document.getElementById('hcpEdit').style.display = 'none';
+  document.getElementById('hcpDisplay').style.display = '';
+}
+
+// === INIT via JSONP ===
+function initDashboard() {
+  showUploadMsg('⏳ Data laden uit Google Sheets...', 'info');
+
+  const callbackName = 'golfSheetCallback_' + Date.now();
+  const script = document.createElement('script');
+  const url = APPS_SCRIPT_URL + '?callback=' + callbackName + '&t=' + Date.now();
+  script.src = url;
+  script.type = 'text/javascript';
+
+  const timeout = setTimeout(() => {
+    showUploadMsg('ℹ️ Google Sheets time-out, gebruik ingebouwde data.', 'info');
+    try { delete window[callbackName]; document.body.removeChild(script); } catch(e) {}
+    DATA = processData(RAW_DATA);
+    renderAll();
+  }, 15000);
+
+  window[callbackName] = function(response) {
+    clearTimeout(timeout);
+    delete window[callbackName];
+    try { document.body.removeChild(script); } catch(e) {}
+    const sheetData = response.data || [];
+    const hcp = response.hcp;
+    if (hcp !== undefined && hcp !== null) {
+      const display = Number.isInteger(hcp) ? String(hcp) : Number(hcp).toFixed(1).replace('.',',');
+      document.getElementById('hcpValue').textContent = display;
+    }
+    if (sheetData && sheetData.length > 0) {
+      const sheetKeys = new Set(sheetData.map(r => `${r.date_str}|${r.Club}|${r.carry}|${r.total}`));
+      const embeddedOnly = RAW_DATA.filter(r => !sheetKeys.has(`${r.date_str}|${r.Club}|${r.carry}|${r.total}`));
+      RAW_DATA.length = 0;
+      RAW_DATA.push(...sheetData, ...embeddedOnly);
+      showUploadMsg(`✅ ${sheetData.length} slagen geladen uit Google Sheets.`, 'success');
+    } else {
+      showUploadMsg('ℹ️ Geen data in Google Sheets, gebruik ingebouwde data.', 'info');
+    }
+    DATA = processData(RAW_DATA);
+    renderAll();
+  };
+
+  script.onerror = function() {
+    clearTimeout(timeout);
+    showUploadMsg('⚠️ Fout bij laden Google Sheets, gebruik ingebouwde data.', 'info');
+    try { delete window[callbackName]; document.body.removeChild(script); } catch(e) {}
+    DATA = processData(RAW_DATA);
+    renderAll();
+  };
+
+  document.head.appendChild(script);
+}
+
+function renderAll() {
+  renderKPIs();
+  renderClubFilter();
+  renderOverviewChart();
+  renderClubCharts();
+  renderTable();
+}
+
+initDashboard();
+</script>
+</body>
+</html>
