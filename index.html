@@ -378,7 +378,7 @@
 // === DATA ===
 const RAW_DATA = [];
 
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz-vx2NLxV2RLk2XMBQN8b8Hp8X3DTYV6BP1yJ8R5kdWiXQcg21DsgXxDCMr8OW89vCYA/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwH9JO-LcOIQ-AUj8Zf9S0mREYmZOG38-a0wf1L34FcQaL9Mp0tM-M-Hv_1wSMGXMCvJQ/exec';
 
 // === CONFIGURATION ===
 // Vaste volgorde van kort naar lang
@@ -805,6 +805,13 @@ function saveHCP() {
   if (!isNaN(num) && num >= 0 && num <= 54) {
     const display = Number.isInteger(num) ? String(num) : num.toFixed(1).replace('.',',');
     document.getElementById('hcpValue').textContent = display;
+    // Save to Google Sheets
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'hcp', value: num })
+    });
   }
   document.getElementById('hcpEdit').style.display = 'none';
   document.getElementById('hcpDisplay').style.display = '';
@@ -831,10 +838,16 @@ function initDashboard() {
     renderAll();
   }, 15000);
 
-  window[callbackName] = function(sheetData) {
+  window[callbackName] = function(response) {
     clearTimeout(timeout);
     delete window[callbackName];
     try { document.body.removeChild(script); } catch(e) {}
+    const sheetData = response.data || [];
+    const hcp = response.hcp;
+    if (hcp !== undefined && hcp !== null) {
+      const display = Number.isInteger(hcp) ? String(hcp) : Number(hcp).toFixed(1).replace('.',',');
+      document.getElementById('hcpValue').textContent = display;
+    }
     if (sheetData && sheetData.length > 0) {
       const sheetKeys = new Set(sheetData.map(r => `${r.date_str}|${r.Club}|${r.carry}|${r.total}`));
       const embeddedOnly = RAW_DATA.filter(r => !sheetKeys.has(`${r.date_str}|${r.Club}|${r.carry}|${r.total}`));
