@@ -63,34 +63,9 @@
     transition: background 0.2s;
     white-space: nowrap;
   }
-  .badge-hcp:hover { background: rgba(251,191,36,0.25); }
-  .badge-hcp-edit {
-    background: var(--gold-dim);
-    border: 1px solid var(--gold);
-    color: var(--gold);
-    font-weight: 600;
-    font-size: 0.8rem;
-    padding: 6px 14px;
-    border-radius: 20px;
-    letter-spacing: 0.5px;
-    align-items: center;
-    gap: 4px;
-  }
-  .upload-btn {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    font-size: 0.8rem;
-    padding: 6px 12px;
-    border-radius: 20px;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    white-space: nowrap;
-  }
-  .upload-btn:hover { border-color: var(--accent); color: var(--text); background: rgba(124,108,255,0.1); }
+
+
+
 
   /* KPI Cards */
   .kpi-grid {
@@ -318,22 +293,12 @@
     <p>Driving Range · Gestart april 2026</p>
   </div>
   <div class="header-actions">
-    <div class="badge-hcp" id="hcpDisplay" title="Klik om handicap aan te passen" onclick="showHCPEdit()">
+    <div class="badge-hcp" id="hcpDisplay" title="Handicap — pas aan via Google Sheets settings tabblad">
       HCP <span id="hcpValue">54</span>
     </div>
-    <div class="badge-hcp-edit" id="hcpEdit" style="display:none">
-      HCP <input id="hcpInput" type="number" min="0" max="54" step="0.1" value="54"
-        style="width:44px;background:transparent;border:none;border-bottom:1px solid var(--gold);color:var(--gold);font-weight:600;font-size:0.8rem;outline:none;text-align:center;"
-        onkeydown="if(event.key==='Enter')saveHCP();if(event.key==='Escape')cancelHCP();"
-        onblur="saveHCP()">
-    </div>
-    <div class="upload-btn" onclick="document.getElementById('fileInput').click()" title="Nieuwe data uploaden">
-      📂 <span>Upload</span>
-    </div>
-    <input type="file" id="fileInput" accept=".csv" style="display:none">
   </div>
 </header>
-<div id="uploadMsg" style="display:none; text-align:center; font-size:0.82rem; margin-top:8px; margin-bottom:4px; font-weight:500;"></div>
+
 
 <!-- KPI Cards -->
 <div class="kpi-grid" id="kpiGrid"></div>
@@ -663,167 +628,11 @@ function setMetric(btn) {
   renderOverviewChart();
 }
 
-// === FILE UPLOAD ===
-document.getElementById('fileInput').addEventListener('change', function(e) {
-  const file = e.target.files[0];
-  if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = function(evt) {
-    const text = evt.target.result;
-    const newRecords = parseCSV(text);
-    if (newRecords.length === 0) {
-      showUploadMsg('❌ Geen geldige data gevonden. Controleer of het bestand de juiste kolommen heeft (date, Club, carry, total).', 'error');
-      return;
-    }
-    // Filter out 3_hybrid
-    const filtered = newRecords.filter(r => r.Club !== '3_hybrid');
-    // Deduplicate: don't add records with same date+Club+carry+total
-    const existing = new Set(RAW_DATA.map(r => `${r.date_str}|${r.Club}|${r.carry}|${r.total}`));
-    const added = filtered.filter(r => !existing.has(`${r.date_str}|${r.Club}|${r.carry}|${r.total}`));
-    if (added.length === 0) {
-      showUploadMsg('ℹ️ Geen nieuwe slagen gevonden — deze data staat al in het dashboard.', 'info');
-      return;
-    }
-    // Update dashboard immediately
-    RAW_DATA.push(...added);
-    DATA = processData(RAW_DATA);
-    activeClubs = null;
-    renderKPIs();
-    renderClubFilter();
-    renderOverviewChart();
-    renderClubCharts();
-    renderTable();
-    showUploadMsg(`⏳ ${added.length} slagen toegevoegd, opslaan naar Google Sheets...`, 'info');
-    // Save to Google Sheets
-    saveToSheet(added);
-  };
-  reader.readAsText(file);
-  this.value = '';
-});
-
-function saveToSheet(records) {
-  fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(records)
-  }).then(() => {
-    showUploadMsg(`✅ Data opgeslagen in Google Sheets! Dashboard bijgewerkt.`, 'success');
-  }).catch(err => {
-    showUploadMsg('⚠️ Dashboard bijgewerkt, maar opslaan naar Google Sheets mislukt.', 'error');
-  });
-}
-
-function parseCSV(text) {
-  const lines = text.trim().split('\n').filter(l => l.trim());
-  if (lines.length < 2) return [];
-
-  // Auto-detect delimiter
-  const sep = lines[0].includes(';') ? ';' : ',';
-  const headers = lines[0].split(sep).map(h => h.trim().replace(/^"|"$/g,''));
-
-  const idx = {
-    date: headers.findIndex(h => h.toLowerCase() === 'date'),
-    club: headers.findIndex(h => h.toLowerCase() === 'club'),
-    carry: headers.findIndex(h => h.toLowerCase() === 'carry'),
-    total: headers.findIndex(h => h.toLowerCase() === 'total'),
-    clubSpeed: headers.findIndex(h => h.toLowerCase().includes('clubspeed')),
-    ballSpeed: headers.findIndex(h => h.toLowerCase().includes('ballspeed')),
-    height: headers.findIndex(h => h.toLowerCase().includes('height') || h.toLowerCase().includes('peakheight')),
-    classification: headers.findIndex(h => h.toLowerCase() === 'classification'),
-  };
-
-  if (idx.club === -1 || idx.carry === -1 || idx.total === -1) return [];
-
-  const records = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(sep).map(c => c.trim().replace(/^"|"$/g,''));
-    if (cols.length < 3) continue;
-
-    // Parse date
-    let date_str = null;
-    if (idx.date !== -1 && cols[idx.date]) {
-      const raw = cols[idx.date];
-      // Try ISO first: 2026-06-08
-      const iso = raw.match(/(\d{4}-\d{2}-\d{2})/);
-      if (iso) {
-        date_str = iso[1];
-      } else {
-        // Try "Mon Jun 08 2026..." — parse manually to avoid timezone issues
-        const MONTHS = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
-        const m = raw.match(/\w{3}\s+(\w{3})\s+(\d{1,2})\s+(\d{4})/);
-        if (m) {
-          const mon = MONTHS[m[1]];
-          const day = m[2].padStart(2,'0');
-          const yr = m[3];
-          if (mon) date_str = yr+'-'+mon+'-'+day;
-        }
-      }
-    }
-    if (!date_str) continue; // skip rows without a valid date
-
-    // Parse numbers — handle both comma and dot decimals
-    const toNum = v => v ? parseFloat(String(v).replace(',','.')) : null;
-    const carry = toNum(cols[idx.carry]);
-    const total = toNum(cols[idx.total]);
-    if (!carry || !total || isNaN(carry) || isNaN(total)) continue;
-
-    records.push({
-      date_str,
-      Club: cols[idx.club] || '',
-      carry,
-      total,
-      clubSpeed: idx.clubSpeed !== -1 ? toNum(cols[idx.clubSpeed]) : null,
-      ballSpeed: idx.ballSpeed !== -1 ? toNum(cols[idx.ballSpeed]) : null,
-      height: idx.height !== -1 ? toNum(cols[idx.height]) : null,
-      classification: idx.classification !== -1 ? (cols[idx.classification] || '') : '',
-    });
-  }
-  return records;
-}
-
-function showUploadMsg(msg, type) {
-  const el = document.getElementById('uploadMsg');
-  const colors = { success: 'var(--green)', error: '#f87171', info: 'var(--gold)' };
-  el.textContent = msg;
-  el.style.color = colors[type] || 'var(--text)';
-  el.style.display = 'block';
-  setTimeout(() => { el.style.display = 'none'; }, 5000);
-}
-
-// === HCP EDITOR ===
-function showHCPEdit() {
-  const current = document.getElementById('hcpValue').textContent.replace(',','.');
-  document.getElementById('hcpInput').value = parseFloat(current);
-  document.getElementById('hcpDisplay').style.display = 'none';
-  document.getElementById('hcpEdit').style.display = 'flex';
-  setTimeout(() => document.getElementById('hcpInput').focus(), 50);
-}
-function saveHCP() {
-  const num = parseFloat(document.getElementById('hcpInput').value);
-  if (!isNaN(num) && num >= 0 && num <= 54) {
-    const display = Number.isInteger(num) ? String(num) : num.toFixed(1).replace('.',',');
-    document.getElementById('hcpValue').textContent = display;
-    // Save to Google Sheets
-    fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'hcp', value: num })
-    });
-  }
-  document.getElementById('hcpEdit').style.display = 'none';
-  document.getElementById('hcpDisplay').style.display = '';
-}
-function cancelHCP() {
-  document.getElementById('hcpEdit').style.display = 'none';
-  document.getElementById('hcpDisplay').style.display = '';
-}
 
 // === INIT via JSONP ===
 function initDashboard() {
-  showUploadMsg('⏳ Data laden uit Google Sheets...', 'info');
+  console.log('Data laden...');
 
   const callbackName = 'golfSheetCallback_' + Date.now();
   const script = document.createElement('script');
@@ -832,7 +641,7 @@ function initDashboard() {
   script.type = 'text/javascript';
 
   const timeout = setTimeout(() => {
-    showUploadMsg('ℹ️ Google Sheets time-out, gebruik ingebouwde data.', 'info');
+    console.log('Timeout.');
     try { delete window[callbackName]; document.body.removeChild(script); } catch(e) {}
     DATA = processData(RAW_DATA);
     renderAll();
@@ -853,9 +662,9 @@ function initDashboard() {
       const embeddedOnly = RAW_DATA.filter(r => !sheetKeys.has(`${r.date_str}|${r.Club}|${r.carry}|${r.total}`));
       RAW_DATA.length = 0;
       RAW_DATA.push(...sheetData, ...embeddedOnly);
-      showUploadMsg(`✅ ${sheetData.length} slagen geladen uit Google Sheets.`, 'success');
+      console.log('Data geladen:', sheetData.length);
     } else {
-      showUploadMsg('ℹ️ Geen data in Google Sheets, gebruik ingebouwde data.', 'info');
+      console.log('Geen sheet data.');
     }
     DATA = processData(RAW_DATA);
     renderAll();
@@ -863,7 +672,7 @@ function initDashboard() {
 
   script.onerror = function() {
     clearTimeout(timeout);
-    showUploadMsg('⚠️ Fout bij laden Google Sheets, gebruik ingebouwde data.', 'info');
+    console.log('Fout.');
     try { delete window[callbackName]; document.body.removeChild(script); } catch(e) {}
     DATA = processData(RAW_DATA);
     renderAll();
